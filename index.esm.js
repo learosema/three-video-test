@@ -1,16 +1,15 @@
 import * as THREE from 'https://cdn.skypack.dev/three';
+import Stats from 'https://cdn.skypack.dev/stats.js';
+
+var stats = new Stats();
+stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
+document.body.appendChild(stats.dom);
+
 const dpr = () => Math.min(window.devicePixelRatio, 2);
 let frame = -1;
 let videoInterval = -1;
 let currentDpr = 1;
-const videoUrls = [
-  'Burning-Charcoal-Fire.mp4',
-  'Pexels-1181911.mp4',
-  'Pexels-2638063.mp4',
-  'Pexels-2832316.mp4',
-  'Pexels-3436.mp4',
-  'pexels-anete-lusina-6353224.mp4',
-];
+
 const canvas = document.querySelector('canvas.webgl');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
 const scene = new THREE.Scene();
@@ -32,12 +31,20 @@ function onResize() {
   currentDpr = dpr();
   renderer.setPixelRatio(currentDpr);
   renderer.setSize(window.innerWidth, window.innerHeight);
+  let idx = 0;
   for (const mesh of scene.children) {
+    const video = mesh.material.map.image;
+    const videoAspect = video.videoWidth / video.videoHeight;
+
+    const width = innerWidth / 2;
+    const height = width / videoAspect;
+    mesh.scale.set(width, height, 1);
     mesh.position.set(
-      Math.floor(-innerWidth / 2 + Math.random() * innerWidth),
-      -innerHeight / 2 + Math.floor(Math.random() * innerHeight),
+      -window.innerWidth / 2 + width / 2 + (idx % 2) * (innerWidth - width),
+      window.innerHeight / 2 - Math.floor(idx / 2) * height - height / 2,
       0
     );
+    idx++;
   }
 }
 
@@ -48,16 +55,20 @@ function videoUpdate() {
 }
 
 function renderLoop() {
+  stats.begin();
   renderer.render(scene, camera);
   if (currentDpr !== dpr()) {
     currentDpr = dpr();
     renderer.setPixelRatio(currentDpr);
   }
+  stats.end();
   frame = requestAnimationFrame(renderLoop);
 }
 
 async function initScene() {
-  console.log(videos);
+  let idx = 0;
+  const geometry = new THREE.PlaneGeometry(1, 1, 1, 1);
+
   for (const video of videos) {
     video.image.src = video.image.getAttribute('data-src');
     video.image.onloadeddata = () => {
@@ -72,23 +83,20 @@ async function initScene() {
       } catch (ex) {
         console.info(ex);
       }
-
-      const width = (300 * video.image.videoWidth) / video.image.videoHeight;
-      const height = 300;
-      const geometry = new THREE.PlaneGeometry(width, height, 1, 1);
+      const videoAspect = video.image.videoWidth / video.image.videoHeight;
+      const width = innerWidth / 2;
+      const height = width / videoAspect;
       const material = new THREE.MeshBasicMaterial({ map: video });
       const mesh = new THREE.Mesh(geometry, material);
+      mesh.scale.set(width, height, 1);
       scene.add(mesh);
-      mesh.position.set(
-        Math.floor(-innerWidth / 2 + Math.random() * innerWidth),
-        -innerHeight / 2 + Math.floor(Math.random() * innerHeight),
-        0
-      );
+      onResize();
     };
+    idx++;
   }
-  onResize();
+
   window.addEventListener('resize', onResize, false);
-  videoInterval = window.setInterval(videoUpdate, 50);
+  videoInterval = window.setInterval(videoUpdate, 100);
   frame = requestAnimationFrame(renderLoop);
 }
 
